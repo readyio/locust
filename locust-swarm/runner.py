@@ -77,6 +77,7 @@ def swarm_up_master(args):
 
 
 def swarm_up_slaves(args):
+    global pool
     logging.info("Bringing up {0} swarm slaves".format(args.num_slaves))
 
     _validate_dirs(args)
@@ -97,12 +98,15 @@ def swarm_up_slaves(args):
 
     update_master_security_group(cfg)
 
-    # TODO: Hack for now, should check for ssh-ability
-    time.sleep(5)
-
     _update_role_defs(get_slave_reservations(cfg), 'slave')
     env.user = cfg.get('fabric', 'user', None)
     env.key_filename = cfg.get('fabric', 'key_filename', None)
+
+    pool = Pool(processes=4)
+    pool.map(is_fabricable, env.roledefs['slave'])
+    pool.close()
+    pool.join()
+
     env.parallel = True
 
     execute(_bootstrap_slave, args.directory, master_ip_address)
@@ -114,14 +118,68 @@ def swarm_up(args):
     swarm_up_slaves(args)
 
 
+def swarm_killall_master(args):
+    logging.info("killing locust on master")
+
+    cfg = get_config(args.config)
+
+    _update_role_defs(get_master_reservations(cfg), 'master')
+    env.user = cfg.get('fabric', 'user', None)
+    env.key_filename = cfg.get('fabric', 'key_filename', None)
+
+    execute(_killall_master)
+    _disconnect_fabric()
+
+def swarm_killall_slaves(args):
+    logging.info("killing locust on slaves")
+
+    cfg = get_config(args.config)
+
+    _update_role_defs(get_slave_reservations(cfg), 'slave')
+    env.user = cfg.get('fabric', 'user', None)
+    env.key_filename = cfg.get('fabric', 'key_filename', None)
+
+    execute(_killall_slave)
+    _disconnect_fabric()
+
+def swarm_run_master(args):
+    logging.info("running locust on master")
+
+    cfg = get_config(args.config)
+
+    _update_role_defs(get_master_reservations(cfg), 'master')
+    env.user = cfg.get('fabric', 'user', None)
+    env.key_filename = cfg.get('fabric', 'key_filename', None)
+
+    execute(_run_master, args.directory, args.locustfile, args.host)
+    _disconnect_fabric()
+
+def swarm_run_slaves(args):
+    logging.info("running locust on master")
+
+    cfg = get_config(args.config)
+
+    _update_role_defs(get_slave_reservations(cfg), 'slave')
+    env.user = cfg.get('fabric', 'user', None)
+    env.key_filename = cfg.get('fabric', 'key_filename', None)
+
+    cfg = get_config(args.config)
+    master_ip_address = get_master_ip_address(cfg)
+    if not master_ip_address:
+        raise Exception("Unable to run slaves without a master. Please "
+                        "bring up a master first.")
+
+    execute(_run_slave, args.directory, master_ip_address, args.locustfile,
+        args.host)
+    _disconnect_fabric()
+
+
 @roles('master')
 def _bootstrap_master(bootstrap_dir_path):
     abs_bootstrap_dir_path = get_abs_path(bootstrap_dir_path)
     _bootstrap(abs_bootstrap_dir_path)
 
     dir_name = os.path.basename(abs_bootstrap_dir_path)
-    run("nohup locust -f /tmp/locust/{0}/locustfile.py \
-        --master >& /dev/null < /dev/null &".format(dir_name), pty=False)
 
 
 @roles('slave')
@@ -130,10 +188,38 @@ def _bootstrap_slave(bootstrap_dir_path, master_ip_address):
     _bootstrap(abs_bootstrap_dir_path)
 
     dir_name = os.path.basename(abs_bootstrap_dir_path)
-    run("nohup locust -f /tmp/locust/{0}/locustfile.py --slave \
-        --master-host={1} >& /dev/null < /dev/null &".
-        format(dir_name, master_ip_address), pty=False)
 
+@roles('master')
+def _killall_master():
+  run("killall locust")
+
+@roles('slave')
+def _killall_slave():
+  run("killall locust")
+
+@roles('master')
+def _run_master(bootstrap_dir_path, locustfile="locustfile.py", host=None):
+  abs_bootstrap_dir_path = get_abs_path(bootstrap_dir_path)
+  dir_name = os.path.basename(abs_bootstrap_dir_path)
+  hoststr = ''
+  if host is not None:
+    hoststr = '--host=' + host
+  run("nohup locust -f /tmp/locust/{dir_name}/{locustfile} {hoststr}\
+      --master >& /dev/null </dev/null &".format(dir_name=dir_name,
+      locustfile=locustfile, hoststr=hoststr), pty=False)
+
+@roles('slave')
+def _run_slave(bootstrap_dir_path, master_ip_address,
+    locustfile="locustfile.py", host=None):
+  abs_bootstrap_dir_path = get_abs_path(bootstrap_dir_path)
+  dir_name = os.path.basename(abs_bootstrap_dir_path)
+  hoststr = ''
+  if host is not None:
+    hoststr = '--host=' + host
+  run("nohup locust -f /tmp/locust/{dir_name}/{locustfile} {hoststr} \
+      --slave --master-host={master_ip_address} >& /dev/null \
+      < /dev/null &".format(dir_name=dir_name, locustfile=locustfile,
+      hoststr=hoststr, master_ip_address=master_ip_address), pty=False)
 
 def _bootstrap(abs_bootstrap_dir_path):
     dir_name = os.path.basename(abs_bootstrap_dir_path)
@@ -167,11 +253,8 @@ def _validate_dirs(args):
 
     if os.path.exists(bootstrap_dir_path):
         bootstrap_file = os.path.join(bootstrap_dir_path, 'bootstrap.sh')
-        if os.path.exists(bootstrap_file):
-            locustfile = os.path.join(bootstrap_dir_path, 'locustfile.py')
-            if os.path.exists(locustfile):
-                logging.info("All proper directories present")
-                return
+        logging.info("All proper directories present")
+        return
 
     raise Exception("Unable to validate bootstrap.sh and locustfile.py are "
                     "present in the directory {0}".format(bootstrap_dir_path))

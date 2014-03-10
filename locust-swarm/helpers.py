@@ -14,11 +14,16 @@ def get_abs_path(dir):
 
 
 def is_fabricable(ip_address, port=22):
-    logging.debug("Attemping to ssh into {0}:{1}".format(ip_address, port))
+    #logging.debug("Attemping to ssh into {0}:{1}".format(ip_address, port))
+    print "Attemping to ssh into {0}:{1}".format(ip_address, port)
     while True:
         if can_ssh(ip_address, port):
+            #logging.debug("successfully sshed into {0}".format(ip_address))
+            print "successfully sshed into {0}".format(ip_address)
             break
-        time.sleep(1)
+        else:
+            print "waiting to ssh into {0}".format(ip_address)
+        time.sleep(10)
 
 
 def can_ssh(host, port=22, timeout=3):

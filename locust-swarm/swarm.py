@@ -16,7 +16,10 @@ from runner import swarm_down_slaves
 from runner import swarm_up
 from runner import swarm_up_master
 from runner import swarm_up_slaves
-
+from runner import swarm_killall_master
+from runner import swarm_killall_slaves
+from runner import swarm_run_master
+from runner import swarm_run_slaves
 
 __all__ = ['main']
 __author__ = "Ryan Kanno <ryankanno@localkinegrinds.com>"
@@ -105,6 +108,84 @@ def init_argparser():
         help='brings down locust master and slaves',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     swarm_down_all.set_defaults(func=swarm_down)
+
+    swarm_killall_parser = cmd_subparser.add_parser(
+        'killall', parents=[common],
+        help='kill locust process on remote server',
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+
+    swarm_killall_options = swarm_killall_parser.add_subparsers(
+        title='supported roles', metavar="<roles>")
+
+    swarm_killall_slave = swarm_killall_options.add_parser(
+        'slaves', parents=[common],
+        help='kill locust process on slaves' ,
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+
+    swarm_killall_slave.set_defaults(func=swarm_killall_slaves)
+
+    swarm_killall_master_cmd = swarm_killall_options.add_parser(
+        'master', parents=[common],
+        help='kill locust process on master',
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+
+    swarm_killall_master_cmd.set_defaults(func=swarm_killall_master)
+
+    swarm_run_parser = cmd_subparser.add_parser(
+        'run', parents=[common],
+        help='runs locust on remote servers (after bootstrap)',
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+
+    swarm_run_options = swarm_run_parser.add_subparsers(
+        title='supported roles', metavar="<roles>")
+
+    swarm_run_slave_cmd = swarm_run_options.add_parser(
+        'slaves', parents=[common],
+        help='run locust on slave',
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+
+    swarm_run_slave_cmd.add_argument(
+        '-d', '--directory', type=str,
+        default=DEFAULT_SLAVE_BOOTSTRAP_DIR,
+        help='directory that contains the locust slave bootstrap files')
+
+    swarm_run_slave_cmd.add_argument(
+        '-f', '--locustfile', type=str,
+        dest='locustfile',
+        default="locustfile.py",
+        help='name of locustfile')
+
+    swarm_run_slave_cmd.add_argument(
+        '-H', '--host', type=str,
+        dest='host',
+        default=None,
+        help='host to swarm')
+
+    swarm_run_slave_cmd.set_defaults(func=swarm_run_slaves)
+
+    swarm_run_master_cmd = swarm_run_options.add_parser(
+        'master', parents=[common],
+        help='run locust on master',
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+
+    swarm_run_master_cmd.add_argument(
+        '-d', '--directory', type=str,
+        default=DEFAULT_SLAVE_BOOTSTRAP_DIR,
+        help='directory that contains the locust master bootstrap files')
+
+    swarm_run_master_cmd.add_argument(
+        '-f', '--locustfile', type=str,
+        dest='locustfile',
+        default="locustfile.py",
+        help='name of locustfile')
+
+    swarm_run_master_cmd.add_argument(
+        '-H', '--host', type=str,
+        dest='host',
+        default=None,
+        help='host to swarm')
+
+    swarm_run_master_cmd.set_defaults(func=swarm_run_master)
 
     return parser
 
