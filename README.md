@@ -1,3 +1,5 @@
+NOTE: what follows is the locust-swarm README from upstream. There's a Kandu-specific README file in the `kandu` directory.
+
 # locust-swarm
 
 Forget about [dragons](https://en.wikipedia.org/wiki/Here_be_dragons), here be locusts.
