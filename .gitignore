@@ -36,3 +36,9 @@ nosetests.xml
 
 locust-swarm.cfg
 locustfile.py
+
+# Pycharm
+.idea/
+
+# Libraries
+src/

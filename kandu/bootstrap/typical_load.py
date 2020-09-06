@@ -137,7 +137,7 @@ class UserBehavior(TaskSet):
     with self.client.post("/flags", data=data, name="/flags [anon]",
         catch_response=True) as response:
       if response.status_code == 400:
-        print response.json()
+        print(response.json())
 
   @task(2)
   def get_categories(self):
